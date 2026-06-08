@@ -976,6 +976,14 @@ export async function initExtensionCommon(context: vscode.ExtensionContext) {
   async function updateMarkdown(uri: string, markdown: string) {
     try {
       const sourceUri = vscode.Uri.parse(uri);
+
+      const allowedExts =
+        getMPEConfig<string[]>('markdownFileExtensions') ?? [];
+      const ext = path.extname(sourceUri.path).toLowerCase();
+      if (!ext || !allowedExts.includes(ext)) {
+        return;
+      }
+
       // Write markdown to file
       await vscode.workspace.fs.writeFile(sourceUri, Buffer.from(markdown));
       // Update preview
@@ -1217,7 +1225,16 @@ export async function initExtensionCommon(context: vscode.ExtensionContext) {
                   },
                 });
               }
-            } else if (previewMode === PreviewMode.MultiplePreviews) {
+            } else if (
+              previewMode === PreviewMode.MultiplePreviews &&
+              automaticallyShowPreviewOfMarkdownBeingEdited
+            ) {
+              // Only surface an already-open preview when the user has opted
+              // into auto-showing previews. Otherwise switching between
+              // markdown files force-reveals the matching preview tab to the
+              // front of its group on every switch, disrupting the editor
+              // layout (the preview is revealed with `preserveFocus`, so the
+              // cursor stays put, but the tab still jumps). Fixes #2286.
               const previews = previewProvider.getPreviews(sourceUri);
               if (previews && previews.length > 0) {
                 previews[0].reveal(/*vscode.ViewColumn.Two*/ undefined, true);
